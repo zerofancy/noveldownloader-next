@@ -16,7 +16,7 @@ class ShuqugeDownloader: IBookDownloader {
     }
 
     override fun getBookInfo(url: String): BookInfo {
-        val document = Jsoup.parse(URL(url), 5_000)
+        val document = retryOnFailure(5) { Jsoup.parse(URL(url), 5_000) }
         val title = document.selectFirst(".info > h2:nth-child(2)")?.text() ?: ""
         val cover = document.selectFirst(".cover > img:nth-child(1)")?.attr("src") ?: ""
         val smallDivContent = document.selectFirst(".small")?.text() ?: ""
@@ -75,16 +75,16 @@ class ShuqugeDownloader: IBookDownloader {
         saver.saveChapter(num, title, content)
     }
 
-    private fun retryOnFailure(times: Int, block: () -> Unit) {
+    private fun <T> retryOnFailure(times: Int, block: () -> T): T {
+        var lastErr: Throwable? = null
         repeat(times) { tried ->
             kotlin.runCatching {
-                block()
-            }.onSuccess {
-                return
+                return block()
             }.onFailure {
                 println("failed ${tried + 1}")
-                it.printStackTrace()
+                lastErr = it
             }
         }
+        throw lastErr!!
     }
 }
