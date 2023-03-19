@@ -5,6 +5,9 @@ import org.jsoup.nodes.Document
 import java.net.URL
 import java.util.regex.Pattern
 
+/**
+ * [书趣阁](https://www.ishuquge.org/)
+ */
 class ShuqugeDownloader: IBookDownloader {
     private val urlRegex = Pattern.compile("http.*?www\\.ishuquge\\.org/txt/(.*?)/index\\.html")
     private val authorRegex = Pattern.compile("作者：(.*?)\\s")

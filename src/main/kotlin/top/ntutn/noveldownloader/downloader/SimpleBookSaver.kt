@@ -5,6 +5,13 @@ import nl.siegmann.epublib.domain.Book
 import nl.siegmann.epublib.domain.Resource
 import nl.siegmann.epublib.epub.EpubWriter
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import java.net.URL
+import java.nio.channels.Channels
+import java.nio.channels.ReadableByteChannel
+import java.util.zip.GZIPInputStream
+import java.util.zip.ZipException
 import kotlin.random.Random
 
 class SimpleBookSaver(private val bookInfo: BookInfo): IChapterSaver {
@@ -46,16 +53,49 @@ class SimpleBookSaver(private val bookInfo: BookInfo): IChapterSaver {
             addTitle(bookInfo.title)
             addAuthor(Author(bookInfo.author))
         }
+        try {
+            val localCoverFile = File(tmpDir, "cover.png")
+            downloadUsingNIO(bookInfo.coverImage!!, localCoverFile)
+            localCoverFile.inputStream().use {
+                book.coverImage = Resource(it, "book_cover.png")
+            }
+            println("设定封面 ${bookInfo.coverImage}")
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
         chapters.sortedBy { it.first }.forEach { pair ->
             val content = File(tmpDir, "${pair.first}.html")
             content.inputStream().use {
                 book.addSection(pair.second, Resource(it, "${pair.first}.html"))
             }
         }
-        val outputFile = File("book.epub")
+        val outputFile = File("${bookInfo.title.trim()}.epub")
         outputFile.outputStream().use {
             EpubWriter().write(book, it)
         }
         println("文件写入$outputFile")
+    }
+
+
+    @Throws(IOException::class)
+    private fun downloadUsingNIO(urlStr: String, file: File) {
+        val tmpFile = File.createTempFile("ndl", ".tmp")
+        tmpFile.deleteOnExit()
+        val url = URL(urlStr)
+        val rbc: ReadableByteChannel = Channels.newChannel(url.openStream())
+        val fos = FileOutputStream(tmpFile)
+        fos.channel.transferFrom(rbc, 0, Long.MAX_VALUE)
+        fos.close()
+        rbc.close()
+
+        println("trying un gzip")
+        try {
+            val gzIns = GZIPInputStream(tmpFile.inputStream())
+            val gzOS = FileOutputStream(file)
+            gzIns.transferTo(gzOS)
+        } catch (e: ZipException) {
+            e.printStackTrace()
+            tmpFile.copyTo(file, true)
+        }
     }
 }
