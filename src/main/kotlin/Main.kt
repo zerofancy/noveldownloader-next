@@ -1,3 +1,4 @@
+import top.ntutn.noveldownloader.downloader.BiqugeDownloader
 import top.ntutn.noveldownloader.downloader.HeTuShuDownloader
 import top.ntutn.noveldownloader.downloader.ShuqugeDownloader
 import top.ntutn.noveldownloader.downloader.SimpleBookSaver
@@ -15,7 +16,7 @@ fun main(args: Array<String>) {
 
     println("你选择了 $url")
 
-    val downloaders = listOf(ShuqugeDownloader(), HeTuShuDownloader())
+    val downloaders = listOf(ShuqugeDownloader(), HeTuShuDownloader(), BiqugeDownloader())
 
     val matchedDownloader = downloaders.find { it.matchBookInfo(url) }
     if (matchedDownloader == null) {

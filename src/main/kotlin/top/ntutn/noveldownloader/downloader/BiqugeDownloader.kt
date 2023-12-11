@@ -6,12 +6,11 @@ import java.net.URL
 import java.util.regex.Pattern
 
 /**
- * [和图书](https://www.hetushu.com/)
+ * [笔趣阁](https://www.biduoxs.cc/)
  */
-@Deprecated("做了保护，不整了")
-class HeTuShuDownloader: IBookDownloader {
-    private val urlRegex = Pattern.compile("https.*?www\\.hetushu\\.com/book/(.*?)/index.html")
-    private val authorRegex = Pattern.compile("作者：(.*?)\\s")
+class BiqugeDownloader: IBookDownloader {
+    private val urlRegex = Pattern.compile("https://www.biduoxs.cc/biquge/(.*?)/")
+    private val authorRegex = Pattern.compile("作\\S*?者：(.*?)\\s")
 
     private var indexUrl = ""
     private var indexDocument: Document? = null
@@ -21,14 +20,16 @@ class HeTuShuDownloader: IBookDownloader {
 
     override fun getBookInfo(url: String): BookInfo {
         val document = retryOnFailure(5) { Jsoup.parse(URL(url), 5_000) }
-        val title = document.selectFirst(".book_info > h2")?.text() ?: ""
-        val cover = document.selectFirst(".book_info > img")?.attr("src") ?: ""
-        val author = document.selectFirst(".book_info > div > a")?.text() ?: ""
+        val title = document.selectFirst("h1")?.text() ?: ""
+        val cover = document.selectFirst("#fmimg > img")?.attr("src") ?: ""
+        val smallDivContent = document.selectFirst("#info")?.text() ?: ""
+        val authorMatcher = authorRegex.matcher(smallDivContent)
+        val author = if (authorMatcher.find()) authorMatcher.group(1).trim() else ""
 
         indexUrl = url
         indexDocument = document
 
-        return BookInfo(title, author, URL(URL(indexUrl), cover).toString())
+        return BookInfo(title, author, cover)
     }
 
     override fun downloadChapters(saver: IChapterSaver, onComplete: () -> Unit) {
@@ -39,12 +40,20 @@ class HeTuShuDownloader: IBookDownloader {
             return
         }
 
-        val links = document.select("#dir > dd > a").mapIndexed { index, element -> Triple(index, element.text(), element.attr("href")) }
+        val chart = document.selectFirst("#list")
+
+        val links = mutableListOf<Triple<Int, String, String>>()
+        chart?.select("a")?.forEachIndexed { index, element ->
+            val title = element.text()
+            val href = element.attr("href")
+
+            println("$index 发现正文，title=$title, href=$href")
+            links.add(Triple(index, title, href))
+        }
 
         println("开始下载进程")
 
         links.forEach {
-            println("$it 开始下载${it.second}")
             downloadArticle(it.first, it.third, saver)
         }
         onComplete()
@@ -53,8 +62,9 @@ class HeTuShuDownloader: IBookDownloader {
     private fun downloadArticle(num: Int, link: String, saver: IChapterSaver) = retryOnFailure(5) {
         val document = Jsoup.parse(URL(URL(indexUrl), link), 5_000)
 
-        val title = document.selectFirst(".h2")?.text() ?: ""
+        val title = document.selectFirst("h1")?.text() ?: ""
         val contentEle = document.selectFirst("#content") ?: throw RuntimeException("未找到正文")
+        contentEle.select("div").remove()
         val content = contentEle.html()
         saver.saveChapter(num, title, content)
     }
